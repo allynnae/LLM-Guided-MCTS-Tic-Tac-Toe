@@ -257,7 +257,9 @@ class LLMPositionEvaluator:
         # Keep output schema very small for easier parsing.
         return (
             "You are evaluating a Tic-Tac-Toe position.\n"
-            "Estimate the probability that the CURRENT PLAYER will eventually win from this state.\n"
+            "The board is shown below as a 3x3 grid.\n"
+            "Rate this position for the CURRENT PLAYER on a 0 to 1 scale:\n"
+            "0.0 = certain loss, 0.5 = draw/unclear, 1.0 = certain win.\n"
             "Return ONLY valid JSON with one key: win_probability\n"
             "Example: {\"win_probability\": 0.73}\n\n"
             f"{board_to_prompt_text(state)}"

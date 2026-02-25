@@ -11,6 +11,7 @@ This project contains two Tic-Tac-Toe MCTS agents in Python:
 - `mcts.py`: baseline MCTS, LLM-guided MCTS, and LLM evaluator.
 - `minimax_agent.py`: simple minimax reference agent.
 - `run_experiments.py`: minimal CLI to run one MCTS move selection.
+- `tictactoe_gui.py`: simple Tkinter GUI to play against baseline or LLM-guided MCTS.
 
 ## Setup
 
@@ -54,3 +55,17 @@ Example: `XO...O..X`
 ```bash
 python run_experiments.py --agent baseline --board XO...O..X --current-player X
 ```
+
+## GUI
+
+Run the GUI:
+
+```bash
+python tictactoe_gui.py
+```
+
+In the GUI:
+- You play as `X`.
+- AI plays as `O`.
+- Choose `baseline` for random-rollout MCTS.
+- Choose `llm` for LLM evaluation (requires API key in environment).

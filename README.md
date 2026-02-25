@@ -11,7 +11,7 @@ This project contains two Tic-Tac-Toe MCTS agents in Python:
 - `mcts.py`: baseline MCTS, LLM-guided MCTS, and LLM evaluator.
 - `minimax_agent.py`: simple minimax reference agent.
 - `run_experiments.py`: minimal CLI to run one MCTS move selection.
-- `tictactoe_gui.py`: simple Tkinter GUI to play against baseline or LLM-guided MCTS.
+- `tictactoe_gui.py`: Tkinter GUI to play against baseline or LLM-guided MCTS.
 
 ## Setup
 
@@ -69,3 +69,9 @@ In the GUI:
 - AI plays as `O`.
 - Choose `baseline` for random-rollout MCTS.
 - Choose `llm` for LLM evaluation (requires API key in environment).
+
+## AI Usage 
+
+Codex was used in the development of this code. Prompts include:
+- Can you help develop a simple TicTacToe GUI?
+- How would you create a class for a single tree node used by MCTS search?

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+import threading
 import tkinter as tk
 from tkinter import messagebox
 
@@ -18,11 +19,19 @@ class TicTacToeGUI:
         # Create the top-level Tk window.
         self.root = tk.Tk()
         self.root.title("Tic-Tac-Toe (MCTS)")
+        # Register an explicit close handler for the window X button.
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
         # Keep game state in memory; human is X and goes first.
         self.state = initial_state()
         self.human_player = "X"
         self.ai_player = "O"
+        # Track whether an AI computation is in progress.
+        self.ai_thinking = False
+        # Track whether the window is closing to ignore late callbacks.
+        self.is_closing = False
+        # Invalidate stale background results when game resets.
+        self.ai_request_id = 0
 
         # Variables connected to the agent controls.
         self.agent_var = tk.StringVar(value="baseline")
@@ -93,6 +102,10 @@ class TicTacToeGUI:
         if is_terminal(self.state):
             return
 
+        # Ignore clicks while AI is still thinking.
+        if self.ai_thinking:
+            return
+
         # Ignore clicks when it is not the human's turn.
         if self.state.current_player != self.human_player:
             return
@@ -110,8 +123,10 @@ class TicTacToeGUI:
             self._show_game_result()
             return
 
-        # Schedule AI move so status text updates before compute starts.
+        # Start AI move computation after status text updates.
         self.status_var.set("AI thinking...")
+        self.ai_thinking = True
+        self._refresh_board()
         self.root.after(10, self._make_ai_move)
 
     # Builds and returns the currently selected agent instance.
@@ -138,14 +153,66 @@ class TicTacToeGUI:
 
     # Computes and applies the AI move based on selected agent settings.
     def _make_ai_move(self) -> None:
-        # Build the configured agent and ask it for a move.
+        # Capture current state snapshot and request id for this worker.
+        state_snapshot = self.state
+        request_id = self.ai_request_id + 1
+        self.ai_request_id = request_id
+
+        # Build agent on main thread (Tk variables are not thread-safe).
         try:
             agent = self._build_agent()
-            ai_move = agent.choose_move(self.state)
         except Exception as exc:
-            # Show clear error if API key/model/provider is misconfigured.
+            self.ai_thinking = False
             messagebox.showerror("Agent Error", str(exc))
             self.status_var.set("Could not make AI move. Check settings.")
+            self._refresh_board()
+            return
+
+        # Compute AI move in a thread so UI remains responsive.
+        worker = threading.Thread(
+            target=self._compute_ai_move_worker,
+            args=(agent, state_snapshot, request_id),
+            daemon=True,
+        )
+        worker.start()
+
+    # Computes AI move in background and sends result back to Tk thread.
+    def _compute_ai_move_worker(self, agent, state_snapshot, request_id: int) -> None:
+        # Choose move off the UI thread.
+        try:
+            ai_move = agent.choose_move(state_snapshot)
+            error_text = None
+        except Exception as exc:
+            ai_move = None
+            error_text = str(exc)
+
+        # Marshal result safely to main thread if app is still open.
+        if not self.is_closing:
+            try:
+                self.root.after(0, lambda: self._finish_ai_move(request_id, state_snapshot, ai_move, error_text))
+            except tk.TclError:
+                # Window may have closed between check and callback scheduling.
+                return
+
+    # Applies background AI result in the Tk thread if result is still valid.
+    def _finish_ai_move(self, request_id: int, state_snapshot, ai_move, error_text: str | None) -> None:
+        # Ignore callbacks after close or from old/stale requests.
+        if self.is_closing or request_id != self.ai_request_id:
+            return
+
+        # Clear thinking flag first so UI can be interacted with again.
+        self.ai_thinking = False
+
+        # Show an error if AI computation failed.
+        if error_text is not None:
+            messagebox.showerror("Agent Error", error_text)
+            self.status_var.set("Could not make AI move. Check settings.")
+            self._refresh_board()
+            return
+
+        # Ignore result if game state changed while AI was thinking.
+        if self.state != state_snapshot:
+            self._refresh_board()
             return
 
         # Apply AI move and redraw.
@@ -162,6 +229,8 @@ class TicTacToeGUI:
     def _refresh_board(self) -> None:
         # A terminal board locks all buttons.
         game_over = is_terminal(self.state)
+        # While AI is thinking, lock board interaction.
+        board_locked = game_over or self.ai_thinking
 
         # Refresh each cell from the state tuple.
         for idx, button in enumerate(self.cell_buttons):
@@ -172,7 +241,7 @@ class TicTacToeGUI:
             button.configure(text=button_text)
 
             # Enable only legal human moves during active human turn.
-            if (not game_over) and (self.state.current_player == self.human_player) and (idx in legal_moves(self.state)):
+            if (not board_locked) and (self.state.current_player == self.human_player) and (idx in legal_moves(self.state)):
                 button.configure(state="normal")
             else:
                 button.configure(state="disabled")
@@ -195,9 +264,20 @@ class TicTacToeGUI:
     # Resets state and UI so a new game can begin.
     def _reset_game(self) -> None:
         # Reinitialize to empty board with human turn first.
+        self.ai_request_id += 1
+        self.ai_thinking = False
         self.state = initial_state()
         self.status_var.set("Your turn (X).")
         self._refresh_board()
+
+    # Handles a window close request from the title-bar X button.
+    def _on_close(self) -> None:
+        # Mark closing and invalidate pending AI callbacks.
+        self.is_closing = True
+        self.ai_request_id += 1
+        # Terminate Tk loop and destroy window immediately.
+        self.root.quit()
+        self.root.destroy()
 
     # Starts the Tk event loop.
     def run(self) -> None:

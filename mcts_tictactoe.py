@@ -27,7 +27,7 @@ WINNING_LINES = (
 class TicTacToeState:
     """Immutable game state with a 9-cell board and side to move."""
 
-    board: Tuple[str, ...]
+    board: Tuple[str, ...] # a tuple containing only str values, with variable length
     current_player: str
 
 
@@ -113,7 +113,7 @@ def board_to_prompt_text(state: TicTacToeState) -> str:
     )
 
 
-# Parses a 9-char board string (X, O, .) into a Tic-Tac-Toe state.
+# Parses a 9-char board string (X, O, .) into a Tic-Tac-Toe state; lets the user start from a custom board position if they want
 def state_from_compact_string(board_text: str, current_player: str) -> TicTacToeState:
     # Normalize and validate the input length.
     cleaned = board_text.strip()

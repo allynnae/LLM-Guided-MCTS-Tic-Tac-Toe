@@ -24,7 +24,7 @@ from mcts_tictactoe import (
 
 @dataclass
 class MCTSNode:
-    """Single tree node used by MCTS search."""
+    """Single tree node used by MCTS search; stores the tree record for one game state"""
 
     state: TicTacToeState
     parent: Optional["MCTSNode"] = None
@@ -157,6 +157,8 @@ class BaselineMCTS:
         return child_node
 
     # Returns the leaf value in [0,1] for the leaf's current player.
+    # If the game is already over: score it directly (win=1, draw=0.5, loss=0) for the current player. 
+    # If not over: play random moves to the end, see who wins, then convert that result to the same score.
     def _leaf_value(self, state: TicTacToeState) -> float:
         # If terminal, compute exact result directly.
         if is_terminal(state):
@@ -171,7 +173,7 @@ class BaselineMCTS:
         # Copy state reference and keep applying random legal moves.
         current = state
         while not is_terminal(current):
-            move = self.rng.choice(legal_moves(current))
+            move = self.rng.choice(legal_moves(current)) # picks one legal move at random 
             current = apply_move(current, move)
         return winner(current)
 
@@ -188,7 +190,7 @@ class BaselineMCTS:
         # Update from leaf back to root.
         for node in reversed(path):
             node.visits += 1
-            node_player = node.player_just_moved()
+            node_player = node.player_just_moved() # Returns the player who made the move that created this node
 
             # Keep values from each node's player perspective.
             if node_player == leaf_player:
@@ -262,7 +264,7 @@ class LLMPositionEvaluator:
             "0.0 = certain loss, 0.5 = draw/unclear, 1.0 = certain win.\n"
             "Return ONLY valid JSON with one key: win_probability\n"
             "Example: {\"win_probability\": 0.73}\n\n"
-            f"{board_to_prompt_text(state)}"
+            f"{board_to_prompt_text(state)}" # Builds a short board description used in LLM prompts.
         )
 
     # Calls OpenAI chat completions endpoint and returns text content.
@@ -331,7 +333,7 @@ class LLMPositionEvaluator:
 
     # Extracts win_probability from model output and clamps to [0,1].
     def _extract_probability(self, raw_text: str) -> float:
-        # First try direct JSON parse.
+        # First try parsing entire response as JSON
         try:
             parsed = json.loads(raw_text)
             value = float(parsed["win_probability"])
